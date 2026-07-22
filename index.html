@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#23171c" />
+  <title>Theatre Archive</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+</head>
+<body>
+  <div id="toast" class="toast"></div>
+  <aside class="sidebar">
+    <div class="brand"><span>TA</span><div><strong>Theatre Archive</strong><small>我的观剧数据库</small></div></div>
+    <nav id="nav">
+      <button data-page="dashboard">首页</button>
+      <button data-page="calendar" class="active">月历</button>
+      <button data-page="shows">剧目</button>
+      <button data-page="actors">演员</button>
+      <button data-page="records">观剧记录</button>
+      <button data-page="summary">观剧总结</button>
+      <button data-page="tools">导入导出</button>
+      <button data-page="settings">设置</button>
+    </nav>
+    <button class="new-record" data-action="new-record">＋ 新增观剧</button>
+  </aside>
+  <main id="app"></main>
+
+  <dialog id="recordDialog" class="dialog wide">
+    <form id="recordForm">
+      <header><div><h2 id="recordTitle">新增观剧记录</h2><p>选择已建立的剧目，再记录这一次观看。</p></div><button type="button" class="close" data-close="recordDialog">×</button></header>
+      <input type="hidden" name="id" />
+      <div class="form-grid">
+        <label>剧目 *<select name="showId" id="recordShowSelect" required></select></label>
+        <label>日期 *<input name="date" type="date" required /></label>
+        <label>场次 *<select name="session"><option>午</option><option>夕</option><option>晚</option><option>自定义</option></select></label>
+        <label id="customSessionWrap" class="hidden">自定义场次<input name="customSession" placeholder="14:30 / 首演" /></label>
+        <label>城市<input name="city" list="cityList" autocomplete="off" /></label><datalist id="cityList"></datalist>
+        <label>剧院<input name="venue" /></label>
+        <div class="span-2 actor-field"><span class="label-title">演员（可多选）</span><div class="inline-add actor-search-row"><input id="newActorName" placeholder="输入演员姓名，自动匹配已有演员" autocomplete="off" /><button type="button" class="secondary" id="addActorInline">添加新演员</button></div><div id="actorPicker" class="chip-picker"></div></div>
+        <label>标签<input name="tags" placeholder="首演, 返场" /></label>
+        <label class="span-2">备注<textarea name="notes" rows="4"></textarea></label>
+        <label class="span-2">观剧照片（可选，可多张）<input id="recordImages" type="file" accept="image/*" multiple /></label>
+        <div id="recordImagePreview" class="image-preview span-2"></div>
+      </div>
+      <footer><button type="button" id="deleteRecord" class="danger hidden">删除</button><span></span><button type="button" class="secondary" data-close="recordDialog">取消</button><button class="primary" type="submit">保存</button></footer>
+    </form>
+  </dialog>
+
+  <dialog id="showDialog" class="dialog wide">
+    <form id="showForm">
+      <header><div><h2 id="showTitle">新增剧目</h2><p>海报只在剧目资料中上传一次。</p></div><button type="button" class="close" data-close="showDialog">×</button></header>
+      <input type="hidden" name="id" />
+      <div class="form-grid">
+        <label>剧目名称 *<input name="name" required /></label>
+        <label>类型<input name="type" list="typeList" /></label>
+        <datalist id="typeList"><option value="音乐剧"><option value="话剧"><option value="舞剧"><option value="歌剧"><option value="戏曲"></datalist>
+        <label>首演年份<input name="premiereYear" type="number" min="1800" max="2200" /></label>
+        <label>标签<input name="tags" /></label>
+        <label class="span-2">剧目海报（3:4 竖版）<input id="showPosterInput" type="file" accept="image/*" /></label>
+        <div id="showPosterPreview" class="poster-preview span-2"></div>
+      </div>
+      <footer><button type="button" id="deleteShow" class="danger hidden">删除</button><span></span><button type="button" class="secondary" data-close="showDialog">取消</button><button class="primary" type="submit">保存剧目</button></footer>
+    </form>
+  </dialog>
+
+  <dialog id="actorDialog" class="dialog">
+    <form id="actorForm">
+      <header><div><h2 id="actorTitle">新增演员</h2><p>演员只需建立一次，之后可重复选择。</p></div><button type="button" class="close" data-close="actorDialog">×</button></header>
+      <input type="hidden" name="id" />
+      <div class="form-grid one"><label>演员姓名 *<input name="name" required /></label><label>备注<textarea name="notes" rows="3"></textarea></label></div>
+      <footer><button type="button" id="deleteActor" class="danger hidden">删除</button><span></span><button type="button" class="secondary" data-close="actorDialog">取消</button><button class="primary" type="submit">保存演员</button></footer>
+    </form>
+  </dialog>
+
+  <dialog id="detailDialog" class="dialog wide"><header><div><h2 id="detailTitle"></h2></div><button class="close" data-close="detailDialog">×</button></header><div id="detailBody"></div></dialog>
+
+  <dialog id="cropDialog" class="dialog wide"><header><div><h2>裁剪海报</h2><p>固定为 3:4 竖版。</p></div><button class="close" data-close="cropDialog">×</button></header><div class="crop-wrap"><canvas id="cropCanvas" width="750" height="1000"></canvas></div><label>缩放<input id="cropZoom" type="range" min="0.5" max="3" step="0.01" value="1" /></label><footer><span></span><button class="secondary" data-close="cropDialog">取消</button><button class="primary" id="saveCrop" type="button">保存裁剪</button></footer></dialog>
+
+  <dialog id="syncDialog" class="dialog">
+    <form id="syncForm"><header><div><h2>GitHub 同步</h2><p>把数据保存到你自己的私有或公开仓库。</p></div><button type="button" class="close" data-close="syncDialog">×</button></header>
+    <div class="form-grid one"><label>用户名<input name="owner" required /></label><label>仓库名<input name="repo" required /></label><label>分支<input name="branch" value="main" required /></label><label>文件路径<input name="path" value="data/theatre-data.json" required /></label><label>Personal Access Token<input name="token" type="password" required /></label><label class="check"><input name="rememberToken" type="checkbox" />在本设备保存 Token</label></div>
+    <footer class="wrap"><button type="button" class="secondary" id="pullGithub">拉取</button><button type="button" class="secondary" id="pushGithub">推送</button><button type="button" class="secondary" id="smartSync">智能同步</button><span></span><button class="primary" type="submit">保存配置</button></footer></form>
+  </dialog>
+  <script src="app.js"></script>
+</body>
+</html>
